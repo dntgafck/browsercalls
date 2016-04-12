@@ -1,0 +1,19 @@
+version: '2'
+services:
+  db:
+      build: ./db
+      #expose port only for development
+      ports:
+        - "5432:5432"
+  app:
+      build: ./server
+      volumes:
+        - ../:/opt/app
+      links:
+        - db
+      ports:
+        - "8000:80"
+      environment:
+        - BROWSERCALL_DB_NAME=browsercall
+        - BROWSERCALL_DB_USER=browsercall
+        - BROWSERCALL_DB_PASS=browsercall
