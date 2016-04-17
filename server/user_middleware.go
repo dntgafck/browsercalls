@@ -1,17 +1,19 @@
 package server
 
 import (
-	"net/http"
-	"fmt"
-	"strings"
 	"errors"
-	"github.com/osvaldshpengler/browsercalls/tools"
+	"fmt"
 	"github.com/gorilla/context"
+	"github.com/osvaldshpengler/browsercalls/tools"
+	"net/http"
+	"strings"
+	"time"
 )
 
 const AUTH_COOKIE_NAME = "bs_auth_session_id"
 
 var ErrUnserializeAuth = errors.New("user_middleware: unserialize cookie error")
+var ErrWrongCredentials = errors.New("user_middleware: cookie credentials mismatch")
 
 type User struct {
 	Id       int
@@ -28,13 +30,38 @@ func userMiddleware(rw http.ResponseWriter, r *http.Request, next http.HandlerFu
 		return
 	}
 
-	id, username, password, email, err := unserializeAuthCookie(authCookie)
+	cId, cUsername, cPassword, cEmail, err := unserializeAuthCookie(authCookie)
 	if nil != err {
+		tools.Log.Info(err, authCookie)
 		next(rw, r)
 	}
 
-	user := &User{id, username, email, password}
+	dba, err := tools.GetDbAccessor()
+	if err != nil {
+		tools.Log.Error(err)
+	}
 
+	var dUsername, dPassword, dEmail string
+	err = dba.QueryRow("SELECT username, email, password FROM users WHERE id = $1", cId).Scan(
+		&dUsername,
+		&dEmail,
+		&dPassword,
+	)
+	if nil != err {
+		tools.Log.Error(err)
+	}
+	if dUsername != cUsername || dEmail != cEmail || cPassword != dPassword {
+		tools.Log.Info(ErrWrongCredentials)
+		next(rw, r)
+	}
+
+	cValue := serializeAuthCookie(cId, dUsername, dPassword, dEmail)
+	cOptions := map[string]interface{}{
+		"expires": time.Now().Add(time.Hour),
+	}
+	cm.Set(rw, AUTH_COOKIE_NAME, cValue, cOptions)
+
+	user := &User{cId, dUsername, dPassword, dEmail}
 	context.Set(r, "user", user)
 }
 

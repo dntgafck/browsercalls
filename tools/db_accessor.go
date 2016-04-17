@@ -20,7 +20,7 @@ var connParams = map[string]string{
 	"password": os.Getenv("BC_DB_PASSWORD"),
 }
 
-func GetDbAccessor(host string, port int, dbname, user, password string) (*sql.DB, error) {
+func GetDbAccessor() (*sql.DB, error) {
 	defer mu.Unlock()
 	mu.Lock()
 	if nil != dbAccessor {

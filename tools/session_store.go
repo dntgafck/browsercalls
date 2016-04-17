@@ -14,7 +14,6 @@ var blockKey = securecookie.GenerateRandomKey(64)
 
 var sessionStore = sessions.NewCookieStore(hashKey, blockKey)
 
-
 func GetSessionStore() *sessions.CookieStore {
 	return sessionStore
 }
