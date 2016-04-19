@@ -24,7 +24,7 @@ func GetDbAccessor() (*sql.DB, error) {
 	defer mu.Unlock()
 	mu.Lock()
 	if nil != dbAccessor {
-		return dbAccessor
+		return dbAccessor, nil
 	}
 
 	dsn, err := createDsn()
@@ -47,7 +47,7 @@ func createDsn() (dsn string, err error) {
 	}
 
 	dsn = fmt.Sprintf(
-		"dbname=%s user=%s password=%s host=%s port=%d sslmode=disable",
+		"dbname=%s user=%s password=%s host=%s port=%s sslmode=disable",
 		connParams["dbname"],
 		connParams["user"],
 		connParams["password"],

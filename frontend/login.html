@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Browser Call App</title>
+
+    <link rel="stylesheet" href="/css/bootstrap.css" />
+</head>
+<body>
+<div class="container">
+    {{if .HasErrors}}
+    <div class="row">
+        <div class="col-md-12">
+            <div class="alert alert-danger" role="alert">
+                Ошибка: {{.Error}}
+            </div>
+        </div>
+    </div>
+    {{end}}
+
+    <div class="row">
+        <div class="col-md-4 col-md-offset-4">
+            <form method="post" id="loginForm">
+                <div class="form-group">
+                    <label for="username">Имя</label>
+                    <input type="text"
+                           name="username"
+                           class="form-control"
+                           {{if .HasFormValues}}
+                           value="{{.Username}}"
+                           {{end}}
+                           id="username"
+                           placeholder="Имя пользователя">
+                </div>
+                <div class="form-group">
+                    <label for="password">Пароль</label>
+                    <input type="password"
+                           name="password"
+                           class="form-control"
+                           {{if .HasFormValues}}
+                           value="{{.Password}}"
+                           {{end}}
+                           id="password"
+                           placeholder="Пароль">
+                </div>
+                <button type="submit" data-type="login" class="btn btn-success">Войти</button>
+                <button type="submit" data-type="register" class="btn btn-primary">Зарегистрироваться</button>
+            </form>
+        </div>
+    </div>
+</div>
+<script src="/js/jquery.js"></script>
+<script>
+    $(function(){
+        $('[type="submit"]').on('click', function(){
+            var type = $(this).data('type');
+            console.log(type);
+            $("#loginForm").attr("action", "/"+type).submit();
+            $("#loginForm").submit();
+            return false;
+        });
+    })
+</script>
+</div>
+</body>
+</html>

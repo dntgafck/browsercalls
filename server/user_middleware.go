@@ -1,85 +1,82 @@
 package server
 
 import (
+	"database/sql"
 	"errors"
-	"fmt"
 	"github.com/gorilla/context"
 	"github.com/osvaldshpengler/browsercalls/tools"
 	"net/http"
-	"strings"
-	"time"
+	"encoding/gob"
 )
 
-const AUTH_COOKIE_NAME = "bs_auth_session_id"
+const SESSION_COOKIE_NAME = "bs_auth_session_id"
 
-var ErrUnserializeAuth = errors.New("user_middleware: unserialize cookie error")
-var ErrWrongCredentials = errors.New("user_middleware: cookie credentials mismatch")
+var ErrUserValidation = errors.New("user_middleware: cookie credentials mismatch")
 
 type User struct {
 	Id       int
 	Username string
-	Email    string
 	Password string
 }
 
+func init() {
+	gob.Register(&User{})
+}
+
 func userMiddleware(rw http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	cm := tools.GetCookieManager()
-	authCookie, err := cm.Get(r, AUTH_COOKIE_NAME)
-	if nil != err {
+	sessStore := tools.GetSessionStore()
+	session, err := sessStore.Get(r, SESSION_COOKIE_NAME)
+	if nil != err || session.IsNew {
 		next(rw, r)
 		return
 	}
 
-	cId, cUsername, cPassword, cEmail, err := unserializeAuthCookie(authCookie)
-	if nil != err {
-		tools.Log.Info(err, authCookie)
+	val := session.Values["user"]
+	u, ok := val.(*User)
+	if !ok {
 		next(rw, r)
+		return
+	}
+	if err = validateUser(u); nil != err {
+		if err == sql.ErrNoRows || err == ErrUserValidation {
+			next(rw, r)
+			return
+		} else {
+			tools.Log.Error(err)
+		}
 	}
 
+	context.Set(r, "user", u)
+	session.Save(r, rw)
+
+	next(rw, r)
+}
+
+func validateUser(u *User) error {
 	dba, err := tools.GetDbAccessor()
 	if err != nil {
-		tools.Log.Error(err)
+		return err
 	}
 
-	var dUsername, dPassword, dEmail string
-	err = dba.QueryRow("SELECT username, email, password FROM users WHERE id = $1", cId).Scan(
-		&dUsername,
-		&dEmail,
-		&dPassword,
+	var username, password string
+	err = dba.QueryRow("SELECT username, password FROM users WHERE id = $1", u.Id).Scan(
+		&username,
+		&password,
 	)
 	if nil != err {
-		tools.Log.Error(err)
-	}
-	if dUsername != cUsername || dEmail != cEmail || cPassword != dPassword {
-		tools.Log.Info(ErrWrongCredentials)
-		next(rw, r)
+		return err
 	}
 
-	cValue := serializeAuthCookie(cId, dUsername, dPassword, dEmail)
-	cOptions := map[string]interface{}{
-		"expires": time.Now().Add(time.Hour),
+	if u.Username != username || u.Password != password {
+		return ErrUserValidation
 	}
-	cm.Set(rw, AUTH_COOKIE_NAME, cValue, cOptions)
 
-	user := &User{cId, dUsername, dPassword, dEmail}
-	context.Set(r, "user", user)
+	return nil
 }
 
-func serializeAuthCookie(id int, username, password, email string) string {
-	return fmt.Sprintf("%d|%s|%s|%s", id, username, password, email)
-}
-
-func unserializeAuthCookie(value string) (id int, username, password, email string, err error) {
-	unserialized := strings.Split(value, "|")
-	if 3 != len(unserialized) {
-		err = ErrUnserializeAuth
-		return
-	}
-
-	id = int(unserialized[0])
-	username = unserialized[1]
-	password = unserialized[2]
-	email = unserialized[3]
-
-	return
+func initUserSession(rw http.ResponseWriter, r *http.Request, u *User) error {
+	sessStore := tools.GetSessionStore()
+	session, _ := sessStore.Get(r, SESSION_COOKIE_NAME)
+	session.Values["user"] = u
+	return session.Save(r, rw)
 }

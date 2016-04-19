@@ -6,6 +6,7 @@ CREATE DATABASE browsercall WITH ENCODING 'UTF8' LC_COLLATE 'ru_RU.utf8'  LC_CTY
 CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(256),
-  email VARCHAR(256),
   password VARCHAR(256)
-)
+);
+
+CREATE UNIQUE INDEX ON users(username);
